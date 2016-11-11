@@ -1,9 +1,9 @@
 ---
 title: 'Introduction to Boosted Trees '
-author: 王泽贤
+author: "王泽贤"
 output:
-  html_notebook: default
   html_document: default
+  html_notebook: default
 ---
 
 ##1.Review of key concepts of supervised learning
