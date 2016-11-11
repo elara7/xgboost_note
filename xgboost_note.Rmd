@@ -1,0 +1,49 @@
+---
+title: "XGBOOST"
+output: html_notebook
+---
+
+
+# 安装
+
+
+```{r}
+install.packages("xgboost")
+```
+
+# 基本使用
+
+```{r}
+require(xgboost)
+data(agaricus.train, package='xgboost')
+data(agaricus.test, package='xgboost')
+train <- agaricus.train
+test <- agaricus.test
+```
+
+目标：判定蘑菇是否有毒，判定依据为若干属性，属性以01表示有无，稀疏矩阵储存。
+```{r}
+class(train$data)
+```
+
+训练模型：
+
+迭代了两次，可以看到函数输出了每一次迭代模型的误差信息。这里的数据是稀疏矩阵，当然也支持普通的稠密矩阵。如果数据文件太大不希望读进R中，我们也可以通过设置参数data = 'path_to_file'使其直接从硬盘读取数据并分析。目前支持直接从硬盘读取libsvm格式的文件。
+
+```{r}
+bst <- xgboost(data=train$data, label=train$label, max.depth =2,eta=1, nround=2, objective="binary:logistic")
+```
+
+预测：
+
+```{r}
+pred <- predict(bst,test$data)
+```
+
+CV
+
+```{r}
+cv.res <- xgb.cv(data=train$data, label=train$label, max.depth=2,eta=1,nround=2,objective="binary:logistic",nfold = 5)
+```
+
+# 

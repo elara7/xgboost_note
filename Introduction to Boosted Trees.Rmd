@@ -1,0 +1,403 @@
+---
+title: 'Introduction to Boosted Trees '
+author: 王泽贤
+output:
+  html_notebook: default
+  html_document: default
+---
+
+##1.Review of key concepts of supervised learning
+
+如何用x预测y
+
+线性模型（包括logit）：$\hat{y}_i = \sum_jw_jx_{ij}$
+
+在不同的任务中$\hat{y}_i$可以有不同的解释：
+
+- 线性模型中$\hat{y}_i$就是预测得分（predicted score）
+
+- logit模型中$\frac{1}{1+e^{-\hat{y_i}}}$是样本为正的概率
+
+目标：从数据中学习到参数$w$的集合$\Theta$
+
+--------------------------
+
+###1.1.objective function
+
+$Obj(\Theta) = L(\Theta) + \Omega(\Theta)$
+
+前者损失函数项目，表示对训练集拟合的好坏
+
+后者正则项，表示模型的复杂度限制
+
+平方损失：$(y_i-\hat{y}_i)^2$
+
+logit损失：$y_iln(1+e^{-\hat{y}_i})+(1-y_i)ln(1+e^{\hat{y}_i})$
+
+L2 norm: $\Omega(\omega) = \lambda||\omega||^2$
+
+L1 norm(lasso): $\Omega(\omega) = \lambda||\omega||_1$
+
+组合：
+
+Ridge=线性模型+平方损失+L2正则项
+
+Lasso=线性模型+平方损失+L1正则项
+
+logit=线性模型+logit损失+L2正则项
+
+--------------------------
+
+##2.Regression Tree and Ensemble (What are we Learning)
+
+###2.1.Regression Tree
+
+和决策数一样的决策规则
+
+每个个叶子上有一个得分
+
+![](C:\\Users\\elara\\Desktop\\20161111144747.png)
+
+--------------------------
+
+###2.2.Regression Tree Ensemble
+
+每次只生成一棵小树，求出得分，最终得分是所有树得分总和
+
+![](C:\\Users\\elara\\Desktop\\20161111145525.png)
+
+- 与输入数据的数量级无关，无须担心对特征的标准化
+
+- 可以学习特征之间的高阶关系
+
+- 可扩展
+
+--------------------------
+
+###2.3.Model
+
+假设我们有K棵树，则
+
+$$\hat{y}_i = \sum_{k=1}^Kf_k(x_i), f_k \in \digamma$$
+其中$\digamma$是所有回归树的函数空间
+
+需要的参数包括每棵树的结构，每个叶子的得分，或者直接用每个树对应的函数作为参数。而不是只学习d纬权重。
+
+--------------------------
+
+###2.4.learning例子
+
+结果：
+
+![](C:\\Users\\elara\\Desktop\\20161111161337.png)
+
+
+需要估计的：
+
+![](C:\\Users\\elara\\Desktop\\20161111161601.png)
+
+splitting positions：树的分割点
+
+Height in each segment：每段（叶）的树得分
+
+--------------------------
+
+###2.5.如何构造单变量回归树目标函数
+
+![](C:\\Users\\elara\\Desktop\\20161111162227.png)
+
+假设有了K个树，那么y的估计值就是数的得分之和。
+
+训练损失函数由估计值和真实值的差异的函数定义（如二次函数）
+
+复杂度可以用树的深度、节点数，或者所有树的叶得分的L2惩罚等来定义
+
+--------------------------
+
+###2.6.与传统决策树对应关系
+
+传统决策树                              | 目标函数
+----------------------------------------|-----------
+根据信息增量（information gain）划分变量| 训练损失
+剪枝                                    | 由节点数定义的正则项
+最大深度                                | 对树的函数空间$\digamma$的限制
+平滑叶节点得分值                        | 对叶节点得分（weight）的L2正则项
+
+--------------------------
+
+###2.7.GBM
+
+如果定义平方损失函数，就是Gradient boosted machine（GBM）
+
+如果定义logit损失函数，就是LogitBoost
+
+--------------------------
+
+##3.Gradient Boosting (How do we Learn)
+
+目标函数：
+
+$$\sum_{i=1}^nl(y_i,\hat{y}_i)+\sum_k\Omega(f_k), f_k\in \digamma$$
+
+非数值向量，而是树，无法使用SGD（随机梯度下降法）
+
+解决方法：Additive Training(Boosting)
+
+从参数预测值开始，每次加一个新函数
+
+![](C:\\Users\\elara\\Desktop\\20161111164516.png)
+
+--------------------------
+
+###3.1.Additive Training
+
+第t次迭代的时候，预测值为
+
+$$\hat{y}_i^{(t)}=\hat{y}_i^{(t-1)}+f_t(x_i)$$
+
+则我们需要最优化第t轮迭代的目标函数
+
+$$Obj^{(t)}=\sum_{i=1}^nl(y_i,\hat{y}_i^{(t)})+\sum_{i=1}^t\Omega(f_i)$$
+
+即
+
+$$Obj^{(t)}=\sum_{i=1}^nl(y_i,\hat{y}_i^{(t-1)}+f_t(x_i))+\sum_{i=1}^t\Omega(f_i)$$
+
+由于之前的树的复杂度已经确定了，所以对应惩罚项已经是常数，即
+
+$$Obj^{(t)}=\sum_{i=1}^nl(y_i,\hat{y}_i^{(t-1)}+f_t(x_i))+\Omega(f_t)+constant$$
+
+考虑平方损失函数：
+
+$$Obj^{(t)}=\sum_{i=1}^n(y_i-(\hat{y}_i^{(t-1)}+f_t(x_i)))^2+\Omega(f_t)+constant$$
+
+展开平方为$(y_i-\hat{y}_i^{(t-1)})^2+2(\hat{y}_i^{(t-1)}-y_i)f_t(x_i)+f_t(x_i)^2$
+
+其中$(y_i-\hat{y}_i^{(t-1)})^2$在t轮时已经为定制可以提出(residual from previous round)
+
+最终为
+
+$$Obj^{(t)}=\sum_{i=1}^n[2(\hat{y}_i^{(t-1)}-y_i)f_t(x_i)+f_t(x_i)^2]+\Omega(f_t)+constant$$
+
+二次损失函数的时候仍然太复杂。
+
+泰勒近似展开：
+
+![](C:\\Users\\elara\\Desktop\\20161111172106.png)
+
+$\Delta x = f_t(x_i).x=\hat{y}_i^{(t-1)}$
+
+$$Obj^{(t)}=\sum_{i=1}^nl(y_i,\hat{y}_i^{(t-1)}+f_t(x_i))+\Omega(f_t)+constant$$
+泰勒展开为
+
+$$Obj^{(t)}\backsimeq\sum_{i=1}^n[l(y_i,\hat{y}_i^{(t-1)})+g_if_t(x_i)+\frac{1}{2}h_if_t^2(x_i)]+\Omega(f_t)+constant$$
+
+当损失函数为二次函数的时候，$g_i=2(\hat{y}_i^{(t-1)}-y_i)$，$h_i=2$
+
+常数在最优化的时候没有用，所以可以移除。得到
+
+$$\sum_{i=1}^n[g_if_t(x_i)+\frac{1}{2}h_if_t^2(x_i)]+\Omega(f_t)$$
+
+--------------------------
+
+###3.2.细化定义树
+
+一棵树定义有T个叶子
+
+样本$R^d$，d维
+
+树结构q：将一个d维样本映射到树中的某一叶。$q:R^d \rightarrow {1,2,\dots,T}$
+
+$\omega \in R^T$,$\omega$是一个T维向量，树的各个叶的权重得分（weight）
+
+对于一个样品，先由q映射到叶序号，再由叶序号决定对应的得分作为函数值
+
+即$f_t(x) = w_{q(x)}$
+
+![](C:\\Users\\elara\\Desktop\\20161111191136.png)
+
+--------------------------
+
+###3.3.定义树的复杂度
+
+一种可能的定义（不唯一）
+
+$$\Omega(f_t) = \gamma T+\frac{1}{2}\lambda\sum_{j=1}^T\omega_j^2$$
+
+![](C:\\Users\\elara\\Desktop\\20161111191931.png)
+
+--------------------------
+
+### 3.4.完成目标函数
+
+定义：落在第j叶子上的样本的集合为：$I_j = \{i|q(x_i)=j\}$，
+
+目标函数：
+
+$$
+\begin{split}
+Obj^{(t)} & \backsimeq \sum_{i=1}^n[g_if_t(x_i)+\frac{1}{2}h_if_t^2(x_i)]+\Omega(f_t) \\
+& = \sum_{i=1}^n[g_i\omega_{q(x_i)}+\frac{1}{2}h_i\omega^2_{q(x_i)}]+\gamma T+\frac{1}{2}\lambda\sum_{j=1}^T\omega_j^2 \\
+\end{split}
+$$
+
+原本按样本相加，转为按叶子相加，样本拆散到每个叶子中成为：
+
+$$Obj^{(t)} \backsimeq \sum_{j=1}^T[(\sum_{i \in I_j}g_i)\omega_j + \frac{1}{2}(\sum_{i \in I_j}h_i + \lambda)\omega_j^2]+\gamma T$$
+
+最终化成T个独立的二次函数求和，利用二次函数的顶点公式可以有：
+
+
+$$
+\begin{split}
+Obj^{(t)} & \backsimeq \sum_{j=1}^T[(\sum_{i \in I_j}g_i)\omega_j + \frac{1}{2}(\sum_{i \in I_j}h_i + \lambda)\omega_j^2]+\gamma T\\
+& = \sum_{j=1}^T[(G_j\omega_j + \frac{1}{2}(H_j + \lambda)\omega_j^2]+\gamma T
+\end{split}
+$$
+
+其中$G_j=\sum_{i \in I_j} g_i$即j叶子中所有样本的损失函数的一阶导数和，$H_j = \sum_{i \in I_j} h_i$即j叶子中所有样本的损失函数的二阶导数和
+
+给定一个树的结构q(x)，每个叶子的最优权重为$\omega_j^* = -\frac{G_j}{H_j+\lambda}$，
+
+最优权重下的目标函数值为：
+
+$$Obj = -\frac{1}{2}\sum_{j=1}^T\frac{G_j^2}{H_j+\lambda}+\gamma T$$
+
+例子：
+
+235号样本年龄大于15岁，在q(x)下判入3号树叶，1和4号中，1号是男性，判入1号树叶，4号是女性，判入4号树叶
+
+G为一个树叶中所有样本的损失函数的一阶导数和，H为一个树叶中所有样本的损失函数的二阶导数和
+
+T为3，有3个叶子
+
+$\lambda$为权重大小惩罚(Ridge)，$\gamma$为叶子个数惩罚。
+
+![](C:\\Users\\elara\\Desktop\\20161111195246.png)
+
+目标函数越小，结构就越好。（好像少了个系数）
+
+--------------------------
+
+### 3.5.搜索单棵最优树的算法
+
+- 枚举可能的q种树结构
+- 计算在当前树结构下的结构得分即$Obj = -\frac{1}{2}\sum_{j=1}^T\frac{G_j^2}{H_j+\lambda}+\gamma T$
+- 找到最小得分，即最佳树结构，并使每个叶子的最优权重为$\omega_j^* = -\frac{G_j}{H_j+\lambda}$
+
+问题：树的可能性无穷多种
+
+--------------------------
+
+#### 3.5.1.贪婪算法与最优分割
+
+- 从深度为0的树开始（1个根节点，0叶子，相当于常数）
+- 对于每个末（叶）节点，加入一个分割点，生成2个子树，子树的选择通过寻找分割点，最小化
+![](C:\\Users\\elara\\Desktop\\20161111201333.png)
+
+- 重复
+
+最优分割点的寻找方法：对于某个特征，将样本按顺序排开，按顺序切分样本直到找到Gain最小的分割点
+
+Gain就是增加分割前的整个棵树的目标函数值-分割后的树的目标函数值，越大说明分割后目标函数值越小，分割效果越好
+
+公式的1/2系数可以去掉，不影响大小关系。
+
+Gain可能是负数：当分割后的损失函数减小，比增加树的惩罚，还小的时候，得到负数。负数说明分割后目标函数值反而变大了
+
+--------------------------
+
+#### 3.5.2.时间复杂度
+
+O(ndKlogn)。需要O(nlogn)来排序，有d个特征，K层
+
+--------------------------
+
+### 3.6.分类变量
+
+可以考虑一些树负责连续变量一些树负责分类变量。但是没必要，可以直接用ont-hot（类似虚拟变量）的方法给名义变量编码。这样做会得到很稀疏的数据集，但是这正是树方法擅长的。
+
+--------------------------
+
+### 3.7.剪枝和正则化
+
+Gain得到负数的时候说明分割带来的收益比增加树带来的惩罚小，tradeoff
+
+pre-stopping：
+
+- 在最优分割的gain为负数的时候停止继续分割。但是可能陷入局部最优
+
+post-prunning：
+
+- 生成最大深度的树，然后删除掉所有gain是负数的叶
+
+--------------------------
+
+### 3.8.综述
+
+- 每次迭代增加一棵新树
+
+- 每次迭代开始前，对每个样本计算$g_i = \partial_{\hat{y}^{(t-1)}}l(y_i,\hat{y}^{(t-1)}$，$h_i = \partial^2_{\hat{y}^{(t-1)}}l(y_i,\hat{y}^{(t-1)}$
+
+- 计算$Obj = -\frac{1}{2}\sum_{j=1}^T\frac{G_j^2}{H_j+\lambda}+\gamma T$使其最小，用贪婪算法来生成树。更准确的说是每次，将一个特征的样本按顺序排开，从头寻找一个分割点(以样本值来划分，不必考虑整个数轴)，使得Gain按这个分割点分割的时候能够最大且大于0，对所有特征都寻找最优分割点，比较所有特征最优分割点的Gain，选择最大的Gain的特征和分割点作为第一次分割。不断重复分割(前一步的特征也可以再分割，从而得到多分割点)，直到生成到无法再分割的最大树，对最大树寻找Gain为负数的叶子进行剪枝。
+
+- 完成上一步的树$f_t(x)$后加入到模型中，计算第t次迭代预测值$\hat{y}_i^{t}=y^{(t-1)}+\epsilon f_t(x_i)$。其中$\epsilon$叫做step-size或者shrinkage（或者学习率），通常在0.1左右。这使得我们在每一步都没有完全最优化，为之后的迭代保留了机会，从而减轻了过拟合的问题。
+
+--------------------------
+
+##4.Summary
+
+如何进行加权回归？使得每个样本有自己的权重
+
+- 对损失函数加入权重如二次损失函数:$l(y_i,\hat{y}_i)=\frac{1}{2}a_i(\hat{y}_i-y_i)^2$，$g_i=a_i(\hat{y}_i-y_i)$，$h_i=a_i$
+
+除了至上而下的分割还有什么方法？
+
+- 自底向上的贪婪算法，从每个单独的样本点开始，每次分割（合并）的时候和临近的点合成一类，动态调整
+
+--------------------------
+
+##Reference
+
+Introduction to Boosted Trees 
+
+Greedy function approximation a gradient boosting machine. J.H. Friedman
+
+- First paper about gradient boosting
+
+Stochastic Gradient Boosting. J.H. Friedman
+
+- Introducing bagging trick to gradient boosting
+
+Elements of Statistical Learning. T. Hastie, R. Tibshirani and J.H. Friedman 
+
+- Contains a chapter about gradient boosted boosting
+
+Additive logistic regression a statistical view of boosting. J.H. Friedman T. Hastie R. Tibshirani
+
+- Uses second-order statistics for tree splitting, which is closer to the view presented in this slide
+
+Learning Nonlinear Functions Using Regularized Greedy Forest. R. Johnson and T. Zhang
+
+- Proposes to do fully corrective step, as well as regularizing the tree complexity. The regularizing trick
+is closed related to the view present in this slide
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
